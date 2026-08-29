@@ -1,0 +1,357 @@
+<!DOCTYPE html>
+<html lang="ar" dir="rtl">
+
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <meta name="theme-color" content="#0f172a">
+    <meta name="description" content="MMR-AI - مساعد الذكاء الاصطناعي الاحترافي للبرمجة والمحادثة">
+    
+    <!-- Open Graph / Meta -->
+    <meta property="og:title" content="MMR-AI V4.0 Pro">
+    <meta property="og:description" content="مساعد الذكاء الاصطناعي المتقدم للبرمجة وكتابة الأكواد">
+    <meta property="og:type" content="website">
+
+    <title>MMR-AI V4 Pro</title>
+    <link rel="icon" href="assets/logo.png" type="image/png">
+    
+    <!-- Fonts & Icons -->
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Cairo:wght@300;400;600;700;800;900&family=JetBrains+Mono:wght@400;500;700&display=swap" rel="stylesheet">
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/font-awesome/6.6.0/css/all.min.css" crossorigin="anonymous" referrerpolicy="no-referrer">
+    
+    <!-- Highlight.js CSS for Code Highlighting -->
+    <link rel="stylesheet" href="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/styles/atom-one-dark.min.css">
+    
+    <link rel="stylesheet" href="style.css">
+</head>
+
+<body class="theme-dark">
+
+    <!-- شاشة التحميل الاحترافية -->
+    <div class="mmr-preloader" id="mmrPreloader">
+        <div class="mmr-ring"></div>
+        <div class="mmr-brand mmr-shine">MMR</div>
+        <div class="mmr-bar"></div>
+    </div>
+
+    <!-- الخلفية البصرية -->
+    <div class="background" aria-hidden="true">
+        <div class="blob blob1"></div>
+        <div class="blob blob2"></div>
+        <div class="blob blob3"></div>
+        <div class="grid"></div>
+    </div>
+
+    <!-- إشعارات Toast -->
+    <div id="toast" role="status" aria-live="polite">
+        <i class="fa-solid fa-circle-check" aria-hidden="true"></i>
+        <span id="toastText">تم الإجراء بنجاح</span>
+    </div>
+
+    <!-- حاوي التطبيق -->
+    <div class="app">
+
+        <!-- القائمة الجانبية -->
+        <aside class="sidebar" id="sidebar">
+            <a href="index.html" id="backToHub" class="logo" style="text-decoration:none;color:inherit;cursor:pointer;" title="الرجوع لمركز MMR الرئيسي">
+                <div class="logoIcon" aria-hidden="true">🤖</div>
+                <div>
+                    <h2 class="mmr-shine">MMR-AI</h2>
+                    <p>Version 4.0 Pro</p>
+                </div>
+            </a>
+
+            <button id="newChat" aria-label="محادثة جديدة">
+                <i class="fa-solid fa-plus" aria-hidden="true"></i>
+                <span data-ar="محادثة جديدة" data-en="New Chat">محادثة جديدة</span>
+            </button>
+
+            <div class="searchBox">
+                <i class="fa-solid fa-magnifying-glass" aria-hidden="true"></i>
+                <input id="searchChats" type="text" placeholder="بحث..." data-ar-placeholder="بحث..." data-en-placeholder="Search..." aria-label="بحث في المحادثات">
+            </div>
+
+            <div class="historyTitle">
+                <span data-ar="المحادثات" data-en="Chats">المحادثات</span>
+                <button id="clearHistory" title="حذف كل المحادثات" aria-label="حذف كل المحادثات">
+                    <i class="fa-solid fa-trash" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <div id="historyList" role="navigation" aria-label="سجل المحادثات"></div>
+        </aside>
+
+        <!-- المحتوى الرئيسي -->
+        <main class="main">
+
+            <!-- الهيدر العلوي -->
+            <header class="header">
+                <div class="headerLeft">
+                    <!-- زر القائمة الجانبية للهواتف -->
+                    <button id="sidebarToggle" class="iconBtn mobileOnly" title="القائمة" aria-label="فتح القائمة">
+                        <i class="fa-solid fa-bars" aria-hidden="true"></i>
+                    </button>
+                    <div>
+                        <h1>MMR-AI</h1>
+                        <p id="welcomeText">كيف أستطيع مساعدتك اليوم؟</p>
+                    </div>
+                </div>
+
+                <div class="headerRight">
+                    <!-- زر إخفاء وإظهار قسم الترحيب -->
+                    <button id="toggleHeroBtn" class="iconBtn" title="إخفاء/إظهار الترحيب" aria-label="إخفاء/إظهار الترحيب">
+                        <i class="fa-solid fa-eye-slash" aria-hidden="true"></i>
+                    </button>
+                    <button id="themeBtn" class="iconBtn" title="تغيير الثيم" aria-label="تغيير الثيم">
+                        <i class="fa-solid fa-palette" aria-hidden="true"></i>
+                    </button>
+                    <button id="languageBtn" class="iconBtn" title="تغيير اللغة" aria-label="تغيير اللغة">
+                        <i class="fa-solid fa-language" aria-hidden="true"></i>
+                    </button>
+                    <button id="settingBtn" class="iconBtn" title="الإعدادات" aria-label="الإعدادات">
+                        <i class="fa-solid fa-gear" aria-hidden="true"></i>
+                    </button>
+                    <a href="index.html" class="iconBtn" title="الرئيسية" aria-label="الرئيسية">
+                        <i class="fa-solid fa-house" aria-hidden="true"></i>
+                    </a>
+                </div>
+            </header>
+
+            <!-- Hero Section (قسم الترحيب) -->
+            <section id="heroSection" class="hero">
+                <h2 id="heroTitle">👋 أهلاً بك في MMR-AI</h2>
+                <p id="heroDescription">
+                    جاهز لمساعدتك في البرمجة، الذكاء الاصطناعي، إنشاء الأكواد، Roblox Lua، Python، JavaScript وغيرها.
+                </p>
+                <!-- نماذج أسئلة سريعة -->
+                <div class="quickPrompts">
+                    <button class="prompt">اكتب لي كود Python بسيط</button>
+                    <button class="prompt">كيف أصنع سكربت Roblox؟</button>
+                    <button class="prompt">اشرح لي مفهوم الذكاء الاصطناعي</button>
+                </div>
+            </section>
+
+            <!-- شاشة الرسائل -->
+            <section id="chatMessages" class="chatMessages" aria-live="polite" aria-label="محتوى المحادثة"></section>
+
+            <button id="scrollToBottom" class="scrollToBottomBtn hidden" title="النزول لآخر الرسائل" aria-label="النزول لآخر الرسائل">
+                <i class="fa-solid fa-arrow-down" aria-hidden="true"></i>
+            </button>
+
+            <!-- صندوق التفكير (Thinking) -->
+            <div id="thinkingBox" class="thinking hidden" aria-live="polite">
+                <div class="thinkingAvatar" aria-hidden="true">🤖</div>
+                <div>
+                    <p>MMR-AI يفكر...</p>
+                    <div class="thinkingDots" aria-hidden="true">
+                        <span></span>
+                        <span></span>
+                        <span></span>
+                    </div>
+                </div>
+                <button id="stopThinking" class="stopThinkingBtn" title="إيقاف" aria-label="إيقاف التفكير">
+                    <i class="fa-solid fa-stop" aria-hidden="true"></i>
+                </button>
+            </div>
+
+            <!-- Preview Box (للملفات والصور) -->
+            <div id="previewBox"></div>
+
+            <!-- صندوق الإدخال الشامل -->
+            <div class="chatInput">
+                <div class="tools">
+                    <button id="uploadImage" title="رفع صورة" aria-label="رفع صورة">
+                        <i class="fa-regular fa-image" aria-hidden="true"></i>
+                    </button>
+                    <button id="uploadFile" title="رفع ملف" aria-label="رفع ملف">
+                        <i class="fa-solid fa-paperclip" aria-hidden="true"></i>
+                    </button>
+                    <button id="voice" title="التسجيل الصوتي" aria-label="التسجيل الصوتي">
+                        <i class="fa-solid fa-microphone" aria-hidden="true"></i>
+                    </button>
+                    
+                    <!-- نمط وسلوك الذكاء الاصطناعي -->
+                    <select id="systemPrompt" title="نمط المساعد" aria-label="نمط المساعد">
+                        <option value="default">💻 مطور عام خبير</option>
+                        <option value="roblox">🎮 خبير Roblox Lua</option>
+                        <option value="teacher">📚 معلم مبسط للمبتدئين</option>
+                    </select>
+                </div>
+
+                <div class="inputBox">
+                    <textarea id="message" rows="1" maxlength="5000" placeholder="اكتب رسالتك..." autocomplete="off" aria-label="ادخل رسالتك"></textarea>
+                    <button id="stopGenerating" class="hidden" title="إيقاف التوليد" aria-label="إيقاف التوليد">
+                        <i class="fa-solid fa-stop" aria-hidden="true"></i>
+                    </button>
+                    <button id="send" title="إرسال" aria-label="إرسال الرسالة">
+                        <i class="fa-solid fa-paper-plane" aria-hidden="true"></i>
+                    </button>
+                </div>
+
+                <div class="bottomInput">
+                    <span id="charCount">0 / 5000</span>
+                    <span id="typingStatus"></span>
+                </div>
+
+                <!-- Input عناصر الحفظ المخبأة -->
+                <input type="file" id="imageInput" accept="image/*" hidden>
+                <input type="file" id="fileInput" hidden>
+            </div>
+
+            <!-- Modal: Settings -->
+            <div id="settings" class="modal hidden" role="dialog" aria-labelledby="settingsTitle" aria-modal="true">
+                <div class="modalContent">
+                    <div class="modalHeader">
+                        <h2 id="settingsTitle">⚙️ الإعدادات</h2>
+                        <button id="closeSettings" aria-label="إغلاق الإعدادات">
+                            <i class="fa-solid fa-xmark" aria-hidden="true"></i>
+                        </button>
+                    </div>
+
+                    <!-- Theme -->
+                    <div class="settingCard">
+                        <label for="theme">🎨 الثيم</label>
+                        <select id="theme">
+                            <option value="dark">🌑 Dark</option>
+                            <option value="light">☀️ Light</option>
+                            <option value="blue">💙 Blue</option>
+                            <option value="purple">💜 Purple</option>
+                            <option value="pink">🩷 Pink</option>
+                            <option value="emerald">💚 Emerald</option>
+                        </select>
+                    </div>
+
+                    <!-- Language -->
+                    <div class="settingCard">
+                        <label for="language">🌍 اللغة</label>
+                        <select id="language">
+                            <option value="ar">العربية</option>
+                            <option value="en">English</option>
+                        </select>
+                    </div>
+
+                    <!-- Font Size -->
+                    <div class="settingCard">
+                        <label for="fontSize">🔠 حجم الخط</label>
+                        <input type="range" id="fontSize" min="14" max="22" value="16">
+                    </div>
+
+                    <!-- Typing Speed -->
+                    <div class="settingCard">
+                        <label for="typingSpeed">⌨️ سرعة الكتابة</label>
+                        <input type="range" id="typingSpeed" min="5" max="40" value="12">
+                    </div>
+
+                    <!-- Switches -->
+                    <div class="switchCard">
+                        <span>✨ تشغيل الأنيميشن</span>
+                        <input type="checkbox" id="animation" checked>
+                    </div>
+                    <div class="switchCard">
+                        <span>🔊 صوت الإشعارات</span>
+                        <input type="checkbox" id="sound">
+                    </div>
+                    <div class="switchCard">
+                        <span>🌌 تأثير الخلفية</span>
+                        <input type="checkbox" id="backgroundEffect" checked>
+                    </div>
+                    <div class="switchCard">
+                        <span>💾 حفظ المحادثات تلقائياً</span>
+                        <input type="checkbox" id="autoSave" checked>
+                    </div>
+                    <div class="switchCard">
+                        <span>🚫 منع السبام</span>
+                        <input type="checkbox" id="antiSpam" checked>
+                    </div>
+
+                    <hr>
+
+                    <div class="settingButtons">
+                        <button id="statsBtn">📊 الإحصائيات</button>
+                        <button id="aboutBtn">ℹ️ عن MMR-AI</button>
+                        <button id="exportChat">📄 تصدير النص (.txt)</button>
+                        <button id="exportBackup">📦 تصدير النسخة الاحتياطية (.json)</button>
+                        <button id="importBackupBtn">📥 استرجاع النسخة الاحتياطية</button>
+                        <button id="clearChat">🗑 حذف المحادثة الحالية</button>
+                    </div>
+                    <input type="file" id="importJsonInput" accept=".json" hidden>
+                </div>
+            </div>
+
+            <!-- Modal: About MMR-AI -->
+            <div id="about" class="modal hidden" role="dialog" aria-labelledby="aboutTitle" aria-modal="true">
+                <div class="modalContent aboutCard">
+                    <div class="modalHeader">
+                        <div class="aboutTitleGroup">
+                            <div class="aboutIcon">🤖</div>
+                            <div class="aboutTitleText">
+                                <h2 id="aboutTitle">MMR-AI</h2>
+                                <span class="versionBadge">v4.0 Pro</span>
+                            </div>
+                        </div>
+                        <button id="closeAboutX" class="closeIconBtn" aria-label="إغلاق">
+                            <i class="fa-solid fa-xmark"></i>
+                        </button>
+                    </div>
+
+                    <p class="aboutDesc">
+                        مساعد برمجتي احترافي ومتطور مدعوم بالذكاء الاصطناعي لكتابة الأكواد، الشرح، وتطوير المشاريع بسرعة وسلاسة.
+                    </p>
+
+                    <div class="featuresGrid">
+                        <div class="featureCard">
+                            <i class="fa-solid fa-code"></i>
+                            <span>تنسيق برمجي ملون وقراءة صوتية</span>
+                        </div>
+                        <div class="featureCard">
+                            <i class="fa-solid fa-brain"></i>
+                            <span>توجيه ذكي تلقائي بين نموذج عميق وسريع حسب صعوبة السؤال</span>
+                        </div>
+                        <div class="featureCard">
+                            <i class="fa-solid fa-box-archive"></i>
+                            <span>حفظ واسترجاع النسخ الاحتياطية</span>
+                        </div>
+                        <div class="featureCard">
+                            <i class="fa-solid fa-wand-magic-sparkles"></i>
+                            <span>ثيمات متعددة وتأثيرات بصرية ممتازة</span>
+                        </div>
+                    </div>
+
+                    <div class="modalFooter">
+                        <button id="closeAbout" class="btnPrimary">إغلاق</button>
+                    </div>
+                </div>
+            </div>
+
+            <!-- Modal: Statistics -->
+            <div id="stats" class="modal hidden" role="dialog" aria-labelledby="statsTitle" aria-modal="true">
+                <div class="modalContent">
+                    <h2 id="statsTitle">📊 الإحصائيات</h2>
+                    <p>عدد المحادثات: <span id="statChats">0</span></p>
+                    <p>عدد الرسائل: <span id="statMessages">0</span></p>
+                    <p>عدد الصور: <span id="statImages">0</span></p>
+                    <p>عدد الملفات: <span id="statFiles">0</span></p>
+                    <button id="closeStats">إغلاق</button>
+                </div>
+            </div>
+
+            <!-- Footer -->
+            <footer class="footer">
+                <span>© 2026 MMR-AI</span>
+                <span>Powered by FJU/Mis</span>
+            </footer>
+
+        </main>
+    </div>
+
+    <!-- External JS Libraries -->
+    <script src="https://cdn.jsdelivr.net/npm/marked/marked.min.js"></script>
+    <script src="https://cdnjs.cloudflare.com/ajax/libs/highlight.js/11.9.0/highlight.min.js"></script>
+    
+    <!-- ملف الجافاسكريبت المحدث والمربوط بالسيرفر -->
+    <script src="app.js"></script>
+</body>
+
+</html>
