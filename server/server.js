@@ -10,17 +10,17 @@ const bcrypt = require('bcryptjs');
 // ==========================================
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
+const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const MONGO_URI = process.env.MONGO_URI;
 
-// اختيار نماذج قوية وسريعة من Google Gemini
-const MODEL_DEEP = "gemini-1.5-pro";     // تفكير عميق / برمجة معقدة
-const MODEL_FAST = "gemini-1.5-flash";   // ردود سريعة وبسيطة
-const MAX_HISTORY_MESSAGES = 20;         // حد أقصى لعدد الرسائل المحفوظة في السياق
-const MAX_RETRIES = 2;                   // عدد محاولات إعادة الاتصال عند الفشل
+// اختيار نماذج Groq القوية والسريعة
+const MODEL_DEEP = "llama-3.3-70b-versatile"; // للمهام المعقدة والبرمجة
+const MODEL_FAST = "llama-3.1-8b-instant";    // للردود السريعة
+const MAX_HISTORY_MESSAGES = 20;
+const MAX_RETRIES = 2;
 
-if (!GEMINI_API_KEY) {
-    console.warn("⚠️ [تحذير]: GEMINI_API_KEY غير موجود في متغيرات البيئة! يرجى إضافته ليعمل الذكاء الاصطناعي.");
+if (!GROQ_API_KEY) {
+    console.warn("⚠️ [تحذير]: GROQ_API_KEY غير موجود في متغيرات البيئة! يرجى إضافته في Railway.");
 }
 
 if (!MONGO_URI) {
@@ -31,7 +31,6 @@ if (!MONGO_URI) {
       .catch(err => console.error('❌ MongoDB Connection Error:', err));
 }
 
-// تصميم شكل بيانات المستخدم ومحادثاته
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true },
     password: { type: String, required: true }, 
@@ -48,10 +47,9 @@ app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
 app.use(express.static(path.join(__dirname, '../')));
 
-// حماية بسيطة للحد من الطلبات المكثفة
 const requestCounts = new Map();
-const RATE_LIMIT_WINDOW_MS = 60 * 1000; // نافذة 1 دقيقة
-const MAX_REQUESTS_PER_WINDOW = 30;     // أقصى حد 30 طلب
+const RATE_LIMIT_WINDOW_MS = 60 * 1000;
+const MAX_REQUESTS_PER_WINDOW = 30;
 
 setInterval(() => {
     const now = Date.now();
@@ -70,7 +68,6 @@ const rateLimiter = (req, res, next) => {
     }
 
     const userData = requestCounts.get(userIp);
-
     if (currentTime - userData.startTime > RATE_LIMIT_WINDOW_MS) {
         userData.count = 1;
         userData.startTime = currentTime;
@@ -78,9 +75,7 @@ const rateLimiter = (req, res, next) => {
     }
 
     if (userData.count >= MAX_REQUESTS_PER_WINDOW) {
-        return res.status(429).json({
-            error: "⚠️ تم تجاوز عدد الطلبات المسموح بها! يرجى الانتظار قليلاً ثم المحاولة."
-        });
+        return res.status(429).json({ error: "⚠️ تم تجاوز عدد الطلبات المسموح بها! يرجى الانتظار قليلاً." });
     }
 
     userData.count++;
@@ -94,13 +89,11 @@ app.use('/api/', rateLimiter);
 // ==========================================
 function classifyTask(systemPrompt, userMessage = "") {
     const text = typeof userMessage === "string" ? userMessage.toLowerCase() : "";
-
     const robloxKeywords = ["roblox", "luau", "remoteevent", "remotefunction", "datastoreservice", "replicatedstorage"];
     const webKeywords = ["html", "css", "javascript", "js", "react", "tailwind", "api", "backend", "node", "express", "sql", "python", "بايثون", "كود", "سكربت", "برمجة", "دالة", "function", "بق", "bug", "error"];
 
     const isRoblox = systemPrompt === "roblox" || robloxKeywords.some(k => text.includes(k));
     const isWeb = systemPrompt === "web" || webKeywords.some(k => text.includes(k));
-
     const isDeepTask = isRoblox || isWeb || text.length > 220;
 
     return {
@@ -111,15 +104,15 @@ function classifyTask(systemPrompt, userMessage = "") {
 
 function getSystemInstruction(domain) {
     const shared = `
-منهجك في حل أي مسألة (اتبعه دائماً بصمت قبل الرد):
-1. فكّك الطلب: حدد بدقة ما يريده المستخدم فعلياً.
-2. اجمع الافتراضات: إذا كانت هناك تفاصيل ناقصة اذكر أقرب افتراض منطقي وامضِ في الحل.
-3. خطط قبل أن تكتب: فكّر في الأخطاء المحتملة والأداء.
-4. تحقق من نفسك: هل يعمل الكود من أول تشغيل؟
-5. اشرح باختصار بعد الكود فقط عند الحاجة.`;
+منهجك في حل أي مسألة:
+1. فكّك الطلب بدقة.
+2. ضع افتراضات منطقية واستمر في الحل فوراً.
+3. خطط للأداء والأمان قبل كتابة الكود.
+4. تأكد أن الكود يعمل من أول تشغيل.
+5. اشرح باختصار بعد الكود عند الحاجة.`;
 
     if (domain === "roblox") {
-        return `أنت MMR-AI، مطور Roblox Luau خبير بأسلوب دافئ وودود ("ابشر يا قلبي"، "تفضل يا الغالي").\n${shared}\nقواعدك: استخدم --!strict، الأمان أولاً، وتجنب حلقات لا نهائية.`;
+        return `أنت MMR-AI، مطور Roblox Luau خبير بأسلوب دافئ وودود ("ابشر يا قلبي"، "تفضل يا الغالي").\n${shared}\nقواعدك: استخدم --!strict، الأمان أولاً، وتجنب الحلقات اللانهائية.`;
     }
     if (domain === "web") {
         return `أنت MMR-AI، مهندس Full-Stack خبير بأسلوب دافئ ("ابشر يا غالي").\n${shared}\nقواعدك: أعطِ الحل الأصح هندسياً وانتبه لثغرات الأمان.`;
@@ -132,48 +125,43 @@ function trimHistory(history) {
     return history.slice(-MAX_HISTORY_MESSAGES);
 }
 
-// بناء هيكل البيانات المخصص لـ Gemini API
-function buildGeminiPayload(systemPrompt, message, history, domain) {
-    const systemInstruction = getSystemInstruction(domain);
-    const contents = [];
+function buildMessages(systemPrompt, message, history, domain) {
+    const messages = [{ role: "system", content: getSystemInstruction(domain) }];
 
     trimHistory(history).forEach(msg => {
         if (msg.role && msg.content) {
-            contents.push({
-                role: msg.role === 'user' ? 'user' : 'model', // Gemini يستخدم model بدل assistant
-                parts: [{ text: msg.content }]
+            messages.push({
+                role: msg.role === 'user' ? 'user' : 'assistant',
+                content: msg.content
             });
         }
     });
 
-    if (message) {
-        contents.push({
-            role: "user",
-            parts: [{ text: message }]
-        });
-    }
-
-    return {
-        systemInstruction: { parts: [{ text: systemInstruction }] },
-        contents: contents,
-        generationConfig: { temperature: 0.4, maxOutputTokens: 4096 }
-    };
+    if (message) messages.push({ role: "user", content: message });
+    return messages;
 }
 
 // ==========================================
-// 4. GEMINI API CALL HELPER
+// 4. GROQ API CALL HELPER
 // ==========================================
-async function callGemini(payload, model, { stream = false } = {}) {
+async function callGroq(messages, model, { stream = false } = {}) {
     let lastError = null;
-    const baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}`;
-    const endpoint = stream ? `${baseUrl}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}` : `${baseUrl}:generateContent?key=${GEMINI_API_KEY}`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-            const response = await fetch(endpoint, {
+            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
                 method: "POST",
-                headers: { "Content-Type": "application/json" },
-                body: JSON.stringify(payload)
+                headers: {
+                    "Authorization": `Bearer ${GROQ_API_KEY}`,
+                    "Content-Type": "application/json"
+                },
+                body: JSON.stringify({
+                    model,
+                    messages,
+                    temperature: 0.4,
+                    max_tokens: 4096,
+                    stream
+                })
             });
 
             if (stream) return response;
@@ -181,10 +169,6 @@ async function callGemini(payload, model, { stream = false } = {}) {
             const data = await response.json();
 
             if (!response.ok) {
-                if (model === MODEL_DEEP && attempt === MAX_RETRIES) {
-                    console.warn("⚠️ [Fallback]: التحويل إلى النموذج السريع بعد الفشل.");
-                    return callGemini(payload, MODEL_FAST, { stream: false });
-                }
                 lastError = data.error?.message || `HTTP ${response.status}`;
                 await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
                 continue;
@@ -197,7 +181,7 @@ async function callGemini(payload, model, { stream = false } = {}) {
         }
     }
 
-    return { ok: false, error: lastError || "فشل الاتصال بخدمة Gemini." };
+    return { ok: false, error: lastError || "فشل الاتصال بخدمة Groq." };
 }
 
 // ==========================================
@@ -250,13 +234,13 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../ai.html')));
 app.get('/api/health', (req, res) => {
     res.json({
         status: "online",
-        system: "MMR-AI Backend (Gemini API)",
+        system: "MMR-AI Backend (Groq API)",
         models: { deep: MODEL_DEEP, fast: MODEL_FAST }
     });
 });
 
 // ==========================================
-// 6. API ROUTES — CHAT (GEMINI ROUTING)
+// 6. API ROUTES — CHAT
 // ==========================================
 app.post('/api/chat', async (req, res) => {
     try {
@@ -267,17 +251,16 @@ app.post('/api/chat', async (req, res) => {
         }
 
         const { domain, model } = classifyTask(systemPrompt, message);
-        const payload = buildGeminiPayload(systemPrompt, message, history, domain);
+        const messages = buildMessages(systemPrompt, message, history, domain);
 
-        const result = await callGemini(payload, model);
+        const result = await callGroq(messages, model);
 
         if (!result.ok) {
-            console.error("❌ [Gemini Error]:", result.error);
+            console.error("❌ [Groq Error]:", result.error);
             return res.status(502).json({ error: result.error });
         }
 
-        // استخراج النص من استجابة Gemini
-        const reply = result.data.candidates?.[0]?.content?.parts?.[0]?.text || "لم يتم استلام رد.";
+        const reply = result.data.choices[0]?.message?.content || "لم يتم استلام رد.";
 
         if (username) {
             await User.findOneAndUpdate(
@@ -298,40 +281,6 @@ app.post('/api/chat', async (req, res) => {
     }
 });
 
-// مسار البث الحي (Streaming)
-app.post('/api/chat/stream', async (req, res) => {
-    try {
-        const { message, history = [], systemPrompt } = req.body;
-        const { domain, model } = classifyTask(systemPrompt, message);
-        const payload = buildGeminiPayload(systemPrompt, message, history, domain);
-
-        res.setHeader('Content-Type', 'text/event-stream');
-        res.setHeader('Cache-Control', 'no-cache');
-        res.setHeader('Connection', 'keep-alive');
-
-        const response = await callGemini(payload, model, { stream: true });
-
-        if (!response.ok) {
-            res.write(`data: ${JSON.stringify({ error: "خطأ في الاتصال بالخدمة" })}\n\n`);
-            return res.end();
-        }
-
-        const reader = response.body.getReader();
-        const decoder = new TextDecoder("utf-8");
-
-        while (true) {
-            const { done, value } = await reader.read();
-            if (done) break;
-            res.write(decoder.decode(value, { stream: true }));
-        }
-        res.end();
-
-    } catch (error) {
-        res.write(`data: ${JSON.stringify({ error: "حدث خطأ" })}\n\n`);
-        res.end();
-    }
-});
-
 // ==========================================
 // 7. SERVER LAUNCH
 // ==========================================
@@ -340,7 +289,7 @@ app.use((req, res) => res.status(404).json({ error: "المسار غير موج�
 const server = app.listen(PORT, () => {
     console.log(`
 ===================================================
-🚀 MMR-AI Backend v5.1 (Google Gemini API + Auth)
+🚀 MMR-AI Backend v6.0 (Groq API + Auth)
 🌐 Local URL: http://localhost:${PORT}
 🧠 Deep model: ${MODEL_DEEP}
 ⚡ Fast model: ${MODEL_FAST}
