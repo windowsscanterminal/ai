@@ -10,7 +10,7 @@ const bcrypt = require('bcryptjs');
 // ==========================================
 const app = express();
 const PORT = process.env.PORT || 3000;
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY;
+const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
 const MONGO_URI = process.env.MONGO_URI;
 
 // اختيار نماذج قوية وسريعة من OpenRouter
@@ -20,7 +20,7 @@ const MAX_HISTORY_MESSAGES = 20;                     // حد أقصى لعدد �
 const MAX_RETRIES = 2;                               // عدد محاولات إعادة الاتصال عند الفشل
 
 if (!OPENROUTER_API_KEY) {
-    console.warn("⚠️ [تحذير]: OPENROUTER_API_KEY غير موجود في ملف .env! يرجى إضافته ليعمل الذكاء الاصطناعي.");
+    console.warn("⚠️ [تحذير]: OPENROUTER_API_KEY غير موجود في متغيرات البيئة! يرجى إضافته ليعمل الذكاء الاصطناعي.");
 }
 
 if (!MONGO_URI) {
@@ -163,7 +163,7 @@ async function callOpenRouter(messages, model, { stream = false } = {}) {
                 headers: {
                     "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
                     "Content-Type": "application/json",
-                    "HTTP-Referer": "http://localhost:3000", // اختيارية لتوثيق موقعك في OpenRouter
+                    "HTTP-Referer": "https://mmr-ai-backend1-production.up.railway.app",
                     "X-Title": "MMR-AI"
                 },
                 body: JSON.stringify({
