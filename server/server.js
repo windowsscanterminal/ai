@@ -10,17 +10,16 @@ const bcrypt = require('bcryptjs');
 // ==========================================
 const app = express();
 const PORT = process.env.PORT || 3000;
-const GROQ_API_KEY = process.env.GROQ_API_KEY;
+const XAI_API_KEY = process.env.XAI_API_KEY; // تم تصحيح اسم المتغير ليطابق xAI
 const MONGO_URI = process.env.MONGO_URI;
 
-// اختيار نماذج xAI (Grok) الرسمية
-const MODEL_DEEP = "grok-beta"; // أو grok-2 إذا توفر في حسابك
+const MODEL_DEEP = "grok-beta"; 
 const MODEL_FAST = "grok-beta";
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_RETRIES = 2;
 
-if (!GROQ_API_KEY) {
-    console.warn("⚠️ [تحذير]: GROQ_API_KEY غير موجود في متغيرات البيئة!");
+if (!XAI_API_KEY) {
+    console.warn("⚠️ [تحذير]: XAI_API_KEY غير موجود في متغيرات البيئة!");
 }
 
 if (!MONGO_URI) {
@@ -149,11 +148,10 @@ async function callXAI(messages, model) {
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-            // تم تعديل الرابط هنا ليتوافق مع xAI الرسمي
             const response = await fetch("https://api.x.ai/v1/chat/completions", {
                 method: "POST",
                 headers: {
-                    "Authorization": `Bearer ${GROQ_API_KEY}`,
+                    "Authorization": `Bearer ${XAI_API_KEY}`,
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
@@ -287,7 +285,7 @@ app.use((req, res) => res.status(404).json({ error: "المسار غير موج�
 const server = app.listen(PORT, () => {
     console.log(`
 ===================================================
-🚀 MMR-AI Backend v6.1 (xAI Grok API + Auth)
+🚀 MMR-AI Backend v6.2 (xAI Grok API + Auth)
 🌐 Local URL: http://localhost:${PORT}
 🧠 Model: grok-beta
 ===================================================
