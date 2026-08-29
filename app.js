@@ -1171,7 +1171,7 @@ async function askAI(prompt) {
     activeAbortController = new AbortController();
 
     try {
-        const res = await fetch("https://mmr-ai-backend1-production.up.railway.app/api/chat", {
+        const res = await fetch("https://ai-production-46b7.up.railway.app/api/chat", {
             method: "POST",
             headers: {
                 "Content-Type": "application/json"
