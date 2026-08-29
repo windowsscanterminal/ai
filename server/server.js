@@ -13,18 +13,18 @@ const PORT = process.env.PORT || 3000;
 const GROQ_API_KEY = process.env.GROQ_API_KEY;
 const MONGO_URI = process.env.MONGO_URI;
 
-// اختيار نماذج Groq القوية والسريعة
-const MODEL_DEEP = "llama-3.3-70b-versatile"; // للمهام المعقدة والبرمجة
-const MODEL_FAST = "llama-3.1-8b-instant";    // للردود السريعة
+// اختيار نماذج xAI (Grok) الرسمية
+const MODEL_DEEP = "grok-beta"; // أو grok-2 إذا توفر في حسابك
+const MODEL_FAST = "grok-beta";
 const MAX_HISTORY_MESSAGES = 20;
 const MAX_RETRIES = 2;
 
 if (!GROQ_API_KEY) {
-    console.warn("⚠️ [تحذير]: GROQ_API_KEY غير موجود في متغيرات البيئة! يرجى إضافته في Railway.");
+    console.warn("⚠️ [تحذير]: GROQ_API_KEY غير موجود في متغيرات البيئة!");
 }
 
 if (!MONGO_URI) {
-    console.warn("⚠️ [تحذير]: MONGO_URI غير موجود في ملف .env أو متغيرات Railway!");
+    console.warn("⚠️ [تحذير]: MONGO_URI غير موجود!");
 } else {
     mongoose.connect(MONGO_URI)
       .then(() => console.log('✅ Connected to MongoDB Atlas successfully!'))
@@ -75,7 +75,7 @@ const rateLimiter = (req, res, next) => {
     }
 
     if (userData.count >= MAX_REQUESTS_PER_WINDOW) {
-        return res.status(429).json({ error: "⚠️ تم تجاوز عدد الطلبات المسموح بها! يرجى الانتظار قليلاً." });
+        return res.status(429).json({ error: "⚠️ تم تجاوز عدد الطلبات المسموح بها!" });
     }
 
     userData.count++;
@@ -112,10 +112,10 @@ function getSystemInstruction(domain) {
 5. اشرح باختصار بعد الكود عند الحاجة.`;
 
     if (domain === "roblox") {
-        return `أنت MMR-AI، مطور Roblox Luau خبير بأسلوب دافئ وودود ("ابشر يا قلبي"، "تفضل يا الغالي").\n${shared}\nقواعدك: استخدم --!strict، الأمان أولاً، وتجنب الحلقات اللانهائية.`;
+        return `أنت MMR-AI، مطور Roblox Luau خبير بأسلوب دافئ وودود ("ابشر يا قلبي"، "تفضل يا الغالي").\n${shared}`;
     }
     if (domain === "web") {
-        return `أنت MMR-AI، مهندس Full-Stack خبير بأسلوب دافئ ("ابشر يا غالي").\n${shared}\nقواعدك: أعطِ الحل الأصح هندسياً وانتبه لثغرات الأمان.`;
+        return `أنت MMR-AI، مهندس Full-Stack خبير بأسلوب دافئ ("ابشر يا غالي").\n${shared}`;
     }
     return `أنت MMR-AI، مساعد ذكي وودود جداً ("ابشر"، "يا قلبي").\n${shared}`;
 }
@@ -142,29 +142,27 @@ function buildMessages(systemPrompt, message, history, domain) {
 }
 
 // ==========================================
-// 4. GROQ API CALL HELPER
+// 4. xAI (Grok) API CALL HELPER
 // ==========================================
-async function callGroq(messages, model, { stream = false } = {}) {
+async function callXAI(messages, model) {
     let lastError = null;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-            const response = await fetch("https://api.groq.com/openai/v1/chat/completions", {
+            // تم تعديل الرابط هنا ليتوافق مع xAI الرسمي
+            const response = await fetch("https://api.x.ai/v1/chat/completions", {
                 method: "POST",
                 headers: {
                     "Authorization": `Bearer ${GROQ_API_KEY}`,
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    model,
+                    model: "grok-beta",
                     messages,
                     temperature: 0.4,
-                    max_tokens: 4096,
-                    stream
+                    max_tokens: 4096
                 })
             });
-
-            if (stream) return response;
 
             const data = await response.json();
 
@@ -181,7 +179,7 @@ async function callGroq(messages, model, { stream = false } = {}) {
         }
     }
 
-    return { ok: false, error: lastError || "فشل الاتصال بخدمة Groq." };
+    return { ok: false, error: lastError || "فشل الاتصال بخدمة xAI." };
 }
 
 // ==========================================
@@ -234,7 +232,7 @@ app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../ai.html')));
 app.get('/api/health', (req, res) => {
     res.json({
         status: "online",
-        system: "MMR-AI Backend (Groq API)",
+        system: "MMR-AI Backend (xAI Grok API)",
         models: { deep: MODEL_DEEP, fast: MODEL_FAST }
     });
 });
@@ -253,10 +251,10 @@ app.post('/api/chat', async (req, res) => {
         const { domain, model } = classifyTask(systemPrompt, message);
         const messages = buildMessages(systemPrompt, message, history, domain);
 
-        const result = await callGroq(messages, model);
+        const result = await callXAI(messages, model);
 
         if (!result.ok) {
-            console.error("❌ [Groq Error]:", result.error);
+            console.error("❌ [xAI Error]:", result.error);
             return res.status(502).json({ error: result.error });
         }
 
@@ -289,10 +287,9 @@ app.use((req, res) => res.status(404).json({ error: "المسار غير موج�
 const server = app.listen(PORT, () => {
     console.log(`
 ===================================================
-🚀 MMR-AI Backend v6.0 (Groq API + Auth)
+🚀 MMR-AI Backend v6.1 (xAI Grok API + Auth)
 🌐 Local URL: http://localhost:${PORT}
-🧠 Deep model: ${MODEL_DEEP}
-⚡ Fast model: ${MODEL_FAST}
+🧠 Model: grok-beta
 ===================================================
     `);
 });
