@@ -10,17 +10,17 @@ const bcrypt = require('bcryptjs');
 // ==========================================
 const app = express();
 const PORT = process.env.PORT || 3000;
-const OPENROUTER_API_KEY = process.env.OPENROUTER_API_KEY || process.env.OPENAI_API_KEY;
+const GEMINI_API_KEY = process.env.GEMINI_API_KEY;
 const MONGO_URI = process.env.MONGO_URI;
 
-// اختيار نماذج قوية وسريعة من OpenRouter
-const MODEL_DEEP = "anthropic/claude-3.5-sonnet";   // تفكير عميق / برمجة معقدة
-const MODEL_FAST = "openai/gpt-4o-mini";            // ردود سريعة وبسيطة
-const MAX_HISTORY_MESSAGES = 20;                     // حد أقصى لعدد الرسائل المحفوظة في السياق
-const MAX_RETRIES = 2;                               // عدد محاولات إعادة الاتصال عند الفشل
+// اختيار نماذج قوية وسريعة من Google Gemini
+const MODEL_DEEP = "gemini-1.5-pro";     // تفكير عميق / برمجة معقدة
+const MODEL_FAST = "gemini-1.5-flash";   // ردود سريعة وبسيطة
+const MAX_HISTORY_MESSAGES = 20;         // حد أقصى لعدد الرسائل المحفوظة في السياق
+const MAX_RETRIES = 2;                   // عدد محاولات إعادة الاتصال عند الفشل
 
-if (!OPENROUTER_API_KEY) {
-    console.warn("⚠️ [تحذير]: OPENROUTER_API_KEY غير موجود في متغيرات البيئة! يرجى إضافته ليعمل الذكاء الاصطناعي.");
+if (!GEMINI_API_KEY) {
+    console.warn("⚠️ [تحذير]: GEMINI_API_KEY غير موجود في متغيرات البيئة! يرجى إضافته ليعمل الذكاء الاصطناعي.");
 }
 
 if (!MONGO_URI) {
@@ -31,10 +31,10 @@ if (!MONGO_URI) {
       .catch(err => console.error('❌ MongoDB Connection Error:', err));
 }
 
-// تصميم شكل بيانات المستخدم ومحادثاته (User Schema & Model)
+// تصميم شكل بيانات المستخدم ومحادثاته
 const userSchema = new mongoose.Schema({
     username: { type: String, required: true, unique: true, trim: true },
-    password: { type: String, required: true }, // مخزّنة بصيغة hash (bcrypt) وليست نصاً صريحاً
+    password: { type: String, required: true }, 
     chats: [{ role: String, content: String, timestamp: { type: Date, default: Date.now } }]
 });
 
@@ -46,16 +46,13 @@ const User = mongoose.model('User', userSchema);
 app.use(cors());
 app.use(express.json({ limit: '10mb' }));
 app.use(express.urlencoded({ extended: true, limit: '10mb' }));
-
-// تقديم الملفات الاستاتيكية من المجلد الرئيسي
 app.use(express.static(path.join(__dirname, '../')));
 
-// حماية بسيطة للحد من الطلبات المكثفة (In-Memory Rate Limiter)
+// حماية بسيطة للحد من الطلبات المكثفة
 const requestCounts = new Map();
 const RATE_LIMIT_WINDOW_MS = 60 * 1000; // نافذة 1 دقيقة
-const MAX_REQUESTS_PER_WINDOW = 30;     // أقصى حد 30 طلب في الدقيقة لكل IP
+const MAX_REQUESTS_PER_WINDOW = 30;     // أقصى حد 30 طلب
 
-// تنظيف دوري لمنع تسرب الذاكرة
 setInterval(() => {
     const now = Date.now();
     for (const [ip, data] of requestCounts.entries()) {
@@ -95,7 +92,6 @@ app.use('/api/', rateLimiter);
 // ==========================================
 // 3. SYSTEM PROMPTS ENGINE + MODEL ROUTER
 // ==========================================
-
 function classifyTask(systemPrompt, userMessage = "") {
     const text = typeof userMessage === "string" ? userMessage.toLowerCase() : "";
 
@@ -116,63 +112,68 @@ function classifyTask(systemPrompt, userMessage = "") {
 function getSystemInstruction(domain) {
     const shared = `
 منهجك في حل أي مسألة (اتبعه دائماً بصمت قبل الرد):
-1. فكّك الطلب: حدد بدقة ما يريده المستخدم فعلياً، حتى لو صاغه بشكل غير مكتمل أو فيه أخطاء إملائية.
-2. اجمع الافتراضات: إذا كانت هناك تفاصيل ناقصة وضرورية جداً لإتمام الحل بشكل صحيح، اذكر أقرب افتراض منطقي وامضِ في الحل فوراً — لا تتوقف لتسأل إلا إذا كان الأمر غامضاً جداً بشكل يمنع أي تقدّم.
-3. خطط قبل أن تكتب: فكّر في الحالات الحدّية (edge cases)، الأخطاء المحتملة، والأداء، قبل كتابة أي سطر كود.
-4. تحقق من نفسك: بعد كتابة الحل، راجعه ذهنياً كأنك تدقق كود شخص آخر — هل يعمل من أول تشغيل؟ هل يفوّت أي حالة؟
-5. اشرح باختصار بعد الكود فقط عند الحاجة: ما الذي فعلته وأين يوضع، بدون حشو.`;
+1. فكّك الطلب: حدد بدقة ما يريده المستخدم فعلياً.
+2. اجمع الافتراضات: إذا كانت هناك تفاصيل ناقصة اذكر أقرب افتراض منطقي وامضِ في الحل.
+3. خطط قبل أن تكتب: فكّر في الأخطاء المحتملة والأداء.
+4. تحقق من نفسك: هل يعمل الكود من أول تشغيل؟
+5. اشرح باختصار بعد الكود فقط عند الحاجة.`;
 
     if (domain === "roblox") {
-        return `أنت MMR-AI، مطور Roblox Luau خبير على مستوى الإنتاج الحقيقي (production-grade)، بأسلوب دافئ وودود ("ابشر يا قلبي"، "تفضل يا الغالي") لكن بدون أي مبالغة تصرف عن الجوهر التقني.
-${shared}
-
-قواعدك البرمجية في Luau:
-- استخدم \`--!strict\` عند الإمكان، وتحقق من الأنواع (types) بدل الاعتماد على التخمين.
-- الأمان أولاً: أي RemoteEvent/RemoteFunction يجب أن يُتحقق من مدخلاته على السيرفر بشكل كامل (لا تثق أبداً بالعميل).
-- الأداء: تجنب حلقات لا نهائية بدون \`task.wait\`، استخدم \`task.spawn\`/\`task.defer\` بدل \`spawn\`/\`wait\` القديمة، وانتبه لتسريبات الذاكرة (تنظيف الاتصالات \`:Disconnect()\` عند الحاجة).
-- التنظيم: اذكر بدقة أين يوضع كل سكربت (ServerScriptService, StarterPlayerScripts, ReplicatedStorage...) ولماذا هناك تحديداً.
-- الكود دائماً كامل 100%، بدون "-- اكمل هنا" وبدون حذف أي جزء، جاهز للتشغيل الفوري.`;
+        return `أنت MMR-AI، مطور Roblox Luau خبير بأسلوب دافئ وودود ("ابشر يا قلبي"، "تفضل يا الغالي").\n${shared}\nقواعدك: استخدم --!strict، الأمان أولاً، وتجنب حلقات لا نهائية.`;
     }
-
     if (domain === "web") {
-        return `أنت MMR-AI، مهندس Full-Stack خبير (JavaScript/TypeScript, React, Node.js, Python, SQL وغيرها)، بأسلوب دافئ ومباشر ("ابشر يا غالي") بدون حشو.
-${shared}
+        return `أنت MMR-AI، مهندس Full-Stack خبير بأسلوب دافئ ("ابشر يا غالي").\n${shared}\nقواعدك: أعطِ الحل الأصح هندسياً وانتبه لثغرات الأمان.`;
+    }
+    return `أنت MMR-AI، مساعد ذكي وودود جداً ("ابشر"، "يا قلبي").\n${shared}`;
+}
 
-قواعدك البرمجية:
-- أعطِ الحل الأصح هندسياً لا فقط الأسرع كتابةً؛ اذكر إن وُجد خيار بديل أفضل للأداء أو الأمان.
-- انتبه دائماً لثغرات الأمان الشائعة (XSS, SQL Injection, كشف بيانات حساسة، عدم تحقق من المدخلات) وعالجها ضمن الكود نفسه دون أن يُطلب منك.
-- الكود كامل، منسّق، وجاهز للنسخ والتشغيل مباشرة — بدون اختصارات أو "...".
-- إذا كان الطلب فيه غموض تقني حقيقي يغيّر الحل جذرياً، اسأل سؤالاً واحداً دقيقاً بدل التخمين.`;
+function trimHistory(history) {
+    if (!Array.isArray(history)) return [];
+    return history.slice(-MAX_HISTORY_MESSAGES);
+}
+
+// بناء هيكل البيانات المخصص لـ Gemini API
+function buildGeminiPayload(systemPrompt, message, history, domain) {
+    const systemInstruction = getSystemInstruction(domain);
+    const contents = [];
+
+    trimHistory(history).forEach(msg => {
+        if (msg.role && msg.content) {
+            contents.push({
+                role: msg.role === 'user' ? 'user' : 'model', // Gemini يستخدم model بدل assistant
+                parts: [{ text: msg.content }]
+            });
+        }
+    });
+
+    if (message) {
+        contents.push({
+            role: "user",
+            parts: [{ text: message }]
+        });
     }
 
-    return `أنت MMR-AI، مساعد ذكي وموسوعي، ودود جداً ("ابشر"، "يا قلبي") وفي نفس الوقت دقيق ومباشر في المحتوى.
-${shared}
-لست مضطراً لكتابة كود في كل رد — فقط عندما يخدم الطلب فعلاً. في الأسئلة العامة، كن واضحاً، صادقاً، ولا تخمّن معلومات لا تعرفها بثقة زائفة.`;
+    return {
+        systemInstruction: { parts: [{ text: systemInstruction }] },
+        contents: contents,
+        generationConfig: { temperature: 0.4, maxOutputTokens: 4096 }
+    };
 }
 
 // ==========================================
-// 4. OPENROUTER CALL HELPER (مع إعادة محاولة + fallback)
+// 4. GEMINI API CALL HELPER
 // ==========================================
-async function callOpenRouter(messages, model, { stream = false } = {}) {
+async function callGemini(payload, model, { stream = false } = {}) {
     let lastError = null;
+    const baseUrl = `https://generativelanguage.googleapis.com/v1beta/models/${model}`;
+    const endpoint = stream ? `${baseUrl}:streamGenerateContent?alt=sse&key=${GEMINI_API_KEY}` : `${baseUrl}:generateContent?key=${GEMINI_API_KEY}`;
 
     for (let attempt = 0; attempt <= MAX_RETRIES; attempt++) {
         try {
-            const response = await fetch("https://openrouter.ai/api/v1/chat/completions", {
+            const response = await fetch(endpoint, {
                 method: "POST",
-                headers: {
-                    "Authorization": `Bearer ${OPENROUTER_API_KEY}`,
-                    "Content-Type": "application/json",
-                    "HTTP-Referer": "https://mmr-ai-backend1-production.up.railway.app",
-                    "X-Title": "MMR-AI"
-                },
-                body: JSON.stringify({
-                    model,
-                    messages,
-                    temperature: 0.4,
-                    max_tokens: 4096,
-                    stream
-                })
+                headers: { "Content-Type": "application/json" },
+                body: JSON.stringify(payload)
             });
 
             if (stream) return response;
@@ -181,8 +182,8 @@ async function callOpenRouter(messages, model, { stream = false } = {}) {
 
             if (!response.ok) {
                 if (model === MODEL_DEEP && attempt === MAX_RETRIES) {
-                    console.warn("⚠️ [Fallback]: التحويل إلى النموذج السريع بعد فشل النموذج العميق.");
-                    return callOpenRouter(messages, MODEL_FAST, { stream: false });
+                    console.warn("⚠️ [Fallback]: التحويل إلى النموذج السريع بعد الفشل.");
+                    return callGemini(payload, MODEL_FAST, { stream: false });
                 }
                 lastError = data.error?.message || `HTTP ${response.status}`;
                 await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
@@ -196,56 +197,26 @@ async function callOpenRouter(messages, model, { stream = false } = {}) {
         }
     }
 
-    return { ok: false, error: lastError || "فشل الاتصال بخدمة OpenRouter بعد عدة محاولات." };
-}
-
-function trimHistory(history) {
-    if (!Array.isArray(history)) return [];
-    return history.slice(-MAX_HISTORY_MESSAGES);
-}
-
-function buildMessages(systemPrompt, message, history, domain) {
-    const messages = [{ role: "system", content: getSystemInstruction(domain) }];
-
-    trimHistory(history).forEach(msg => {
-        if (msg.role && msg.content) {
-            messages.push({
-                role: msg.role === 'user' ? 'user' : 'assistant',
-                content: msg.content
-            });
-        }
-    });
-
-    if (message) messages.push({ role: "user", content: message });
-    return messages;
+    return { ok: false, error: lastError || "فشل الاتصال بخدمة Gemini." };
 }
 
 // ==========================================
-// 5. API ROUTES — AUTH (كلمات مرور مشفّرة)
+// 5. API ROUTES — AUTH
 // ==========================================
 const SALT_ROUNDS = 10;
 
 app.post('/api/register', async (req, res) => {
     try {
         const { username, password } = req.body;
-
-        if (!username || !password) {
-            return res.status(400).json({ success: false, error: 'يرجى إدخال اسم المستخدم وكلمة المرور' });
-        }
-        if (typeof password !== 'string' || password.length < 6) {
-            return res.status(400).json({ success: false, error: 'كلمة المرور يجب أن تكون 6 أحرف على الأقل' });
-        }
-
+        if (!username || !password) return res.status(400).json({ success: false, error: 'البيانات ناقصة' });
+        
         const existingUser = await User.findOne({ username });
-        if (existingUser) {
-            return res.status(400).json({ success: false, error: 'اسم المستخدم موجود مسبقاً' });
-        }
+        if (existingUser) return res.status(400).json({ success: false, error: 'المستخدم موجود' });
 
         const hashedPassword = await bcrypt.hash(password, SALT_ROUNDS);
         const newUser = new User({ username, password: hashedPassword, chats: [] });
         await newUser.save();
-
-        res.json({ success: true, message: 'تم إنشاء الحساب بنجاح', username });
+        res.json({ success: true, message: 'تم الإنشاء', username });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -254,19 +225,11 @@ app.post('/api/register', async (req, res) => {
 app.post('/api/login', async (req, res) => {
     try {
         const { username, password } = req.body;
-
-        if (!username || !password) {
-            return res.status(400).json({ success: false, error: 'يرجى إدخال اسم المستخدم وكلمة المرور' });
-        }
-
         const user = await User.findOne({ username });
-        const passwordMatches = user ? await bcrypt.compare(password, user.password) : false;
+        const isMatch = user ? await bcrypt.compare(password, user.password) : false;
 
-        if (!user || !passwordMatches) {
-            return res.status(400).json({ success: false, error: 'اسم المستخدم أو كلمة المرور غير صحيحة' });
-        }
-
-        res.json({ success: true, message: 'تم تسجيل الدخول بنجاح', username, chats: user.chats });
+        if (!user || !isMatch) return res.status(400).json({ success: false, error: 'بيانات غير صحيحة' });
+        res.json({ success: true, username, chats: user.chats });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
@@ -274,64 +237,54 @@ app.post('/api/login', async (req, res) => {
 
 app.get('/api/chats/:username', async (req, res) => {
     try {
-        const { username } = req.params;
-        const user = await User.findOne({ username });
-        if (!user) {
-            return res.status(404).json({ success: false, error: 'المستخدم غير موجود' });
-        }
+        const user = await User.findOne({ username: req.params.username });
+        if (!user) return res.status(404).json({ success: false, error: 'غير موجود' });
         res.json({ success: true, chats: user.chats });
     } catch (err) {
         res.status(500).json({ success: false, error: err.message });
     }
 });
 
-app.get('/', (req, res) => {
-    res.sendFile(path.join(__dirname, '../ai.html'));
-});
+app.get('/', (req, res) => res.sendFile(path.join(__dirname, '../ai.html')));
 
 app.get('/api/health', (req, res) => {
     res.json({
         status: "online",
-        system: "MMR-AI Backend (OpenRouter)",
-        models: { deep: MODEL_DEEP, fast: MODEL_FAST },
-        timestamp: new Date().toISOString()
+        system: "MMR-AI Backend (Gemini API)",
+        models: { deep: MODEL_DEEP, fast: MODEL_FAST }
     });
 });
 
 // ==========================================
-// 6. API ROUTES — CHAT (مع توجيه ذكي للنموذج)
+// 6. API ROUTES — CHAT (GEMINI ROUTING)
 // ==========================================
 app.post('/api/chat', async (req, res) => {
     try {
         const { message, history = [], systemPrompt, username } = req.body;
 
         if (!message && (!history || history.length === 0)) {
-            return res.status(400).json({ error: "يرجى إرسال رسالة أو محادثة صحيحة." });
+            return res.status(400).json({ error: "يرجى إرسال رسالة." });
         }
 
         const { domain, model } = classifyTask(systemPrompt, message);
-        const messages = buildMessages(systemPrompt, message, history, domain);
+        const payload = buildGeminiPayload(systemPrompt, message, history, domain);
 
-        const result = await callOpenRouter(messages, model);
+        const result = await callGemini(payload, model);
 
         if (!result.ok) {
-            console.error("❌ [OpenRouter Error]:", result.error);
-            return res.status(502).json({ error: result.error || "حدث خطأ في الاتصال بسيرفر OpenRouter API" });
+            console.error("❌ [Gemini Error]:", result.error);
+            return res.status(502).json({ error: result.error });
         }
 
-        const reply = result.data.choices[0]?.message?.content || "لم يتم استلام رد من النموذج.";
+        // استخراج النص من استجابة Gemini
+        const reply = result.data.candidates?.[0]?.content?.parts?.[0]?.text || "لم يتم استلام رد.";
 
         if (username) {
             await User.findOneAndUpdate(
                 { username },
                 {
                     $push: {
-                        chats: {
-                            $each: [
-                                { role: 'user', content: message },
-                                { role: 'assistant', content: reply }
-                            ]
-                        }
+                        chats: { $each: [{ role: 'user', content: message }, { role: 'assistant', content: reply }] }
                     }
                 }
             );
@@ -341,22 +294,22 @@ app.post('/api/chat', async (req, res) => {
 
     } catch (error) {
         console.error("💥 [Server Error]:", error);
-        res.status(500).json({ error: "حدث خطأ في السيرفر الداخلي" });
+        res.status(500).json({ error: "خطأ داخلي" });
     }
 });
 
-// مسار البث الحي (Streaming API - SSE)
+// مسار البث الحي (Streaming)
 app.post('/api/chat/stream', async (req, res) => {
     try {
         const { message, history = [], systemPrompt } = req.body;
         const { domain, model } = classifyTask(systemPrompt, message);
-        const messages = buildMessages(systemPrompt, message, history, domain);
+        const payload = buildGeminiPayload(systemPrompt, message, history, domain);
 
         res.setHeader('Content-Type', 'text/event-stream');
         res.setHeader('Cache-Control', 'no-cache');
         res.setHeader('Connection', 'keep-alive');
 
-        const response = await callOpenRouter(messages, model, { stream: true });
+        const response = await callGemini(payload, model, { stream: true });
 
         if (!response.ok) {
             res.write(`data: ${JSON.stringify({ error: "خطأ في الاتصال بالخدمة" })}\n\n`);
@@ -369,43 +322,30 @@ app.post('/api/chat/stream', async (req, res) => {
         while (true) {
             const { done, value } = await reader.read();
             if (done) break;
-            const chunk = decoder.decode(value, { stream: true });
-            res.write(chunk);
+            res.write(decoder.decode(value, { stream: true }));
         }
-
-        res.write('data: [DONE]\n\n');
         res.end();
 
     } catch (error) {
-        console.error("💥 [Stream Error]:", error);
-        res.write(`data: ${JSON.stringify({ error: "حدث خطأ أثناء بث البيانات" })}\n\n`);
+        res.write(`data: ${JSON.stringify({ error: "حدث خطأ" })}\n\n`);
         res.end();
     }
 });
 
 // ==========================================
-// 7. SERVER LAUNCH & CATCH-ALLS
+// 7. SERVER LAUNCH
 // ==========================================
-
-app.use((req, res) => {
-    res.status(404).json({ error: "المسار المطلوب غير موجود 404" });
-});
+app.use((req, res) => res.status(404).json({ error: "المسار غير موجود 404" }));
 
 const server = app.listen(PORT, () => {
     console.log(`
 ===================================================
-🚀 MMR-AI Backend v5.0 (OpenRouter + Secure Auth)
+🚀 MMR-AI Backend v5.1 (Google Gemini API + Auth)
 🌐 Local URL: http://localhost:${PORT}
-⚡ API Stream: http://localhost:${PORT}/api/chat/stream
 🧠 Deep model: ${MODEL_DEEP}
 ⚡ Fast model: ${MODEL_FAST}
 ===================================================
     `);
 });
 
-process.on('SIGTERM', () => {
-    console.log('SIGTERM received. Closing HTTP server gracefully...');
-    server.close(() => {
-        console.log('HTTP server closed.');
-    });
-});
+process.on('SIGTERM', () => server.close(() => console.log('HTTP server closed.')));
