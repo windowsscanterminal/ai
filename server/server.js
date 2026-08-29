@@ -155,7 +155,7 @@ async function callXAI(messages, model) {
                     "Content-Type": "application/json"
                 },
                 body: JSON.stringify({
-                    model: "grok-beta",
+                    model: "grok-2-latest", // <-- تم التعديل هنا ليتوافق مع المعيار الحالي
                     messages,
                     temperature: 0.4,
                     max_tokens: 4096
@@ -165,6 +165,8 @@ async function callXAI(messages, model) {
             const data = await response.json();
 
             if (!response.ok) {
+                // سيطبع لك السبب الدقيق للخطأ 400 في الـ terminal عندك
+                console.error("❌ xAI Error Details:", JSON.stringify(data, null, 2));
                 lastError = data.error?.message || `HTTP ${response.status}`;
                 await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
                 continue;
@@ -172,14 +174,13 @@ async function callXAI(messages, model) {
 
             return { ok: true, data };
         } catch (err) {
-            lastError = err.message;
+                    lastError = err.message;
             await new Promise(r => setTimeout(r, 400 * (attempt + 1)));
         }
     }
 
     return { ok: false, error: lastError || "فشل الاتصال بخدمة xAI." };
 }
-
 // ==========================================
 // 5. API ROUTES — AUTH
 // ==========================================
